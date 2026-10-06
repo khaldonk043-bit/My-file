@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النظام الاحصائي لإدارة بنك الدم</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- FontAwesome للأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- مكتبة تقويم التاريخ الهجري -->
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/min/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        @media print { 
+            .no-print, button, form, input, select, aside, .login-container { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+            main { padding: 0 !important; margin: 0 !important; max-height: none !important; overflow: visible !important; }
+            table { border: 1px solid #000 !important; width: 100% !important; }
+            th, td { border: 1px solid #000 !important; color: #000 !important; }
+        }
+        
+        .hidden-system { display: none !important; }
+        
+        /* Tooltip style */
+        .tooltip-wrap { position: relative; display: inline-block; }
+        .tooltip-wrap .tooltip-box {
+            visibility: hidden; background-color: #0f172a; color: #fff; text-align: center;
+            border-radius: 6px; padding: 4px 8px; position: absolute; z-index: 60;
+            bottom: 125%; right: 50%; transform: translateX(50%);
+            opacity: 0; transition: opacity 0.2s ease-in-out; font-size: 10px; white-space: nowrap;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .tooltip-wrap:hover .tooltip-box { visibility: visible; opacity: 1; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+    <!-- شاشة تسجيل الدخول -->
+    <div id="loginScreen" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center p-4 login-container">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 sm:p-8 space-y-6">
+            <div class="text-center space-y-2">
+                <div class="bg-red-600 text-white w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-red-600/30">
+                    <i class="fa-solid fa-droplet text-2xl animate-pulse"></i>
+                </div>
+                <h1 class="text-lg font-bold text-slate-900">تسجيل الدخول للنظام الطبي</h1>
+                <p class="text-xs text-slate-500">المركز الوطني لنقل الدم وأبحاثه</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">اسم المستخدم:</label>
+                    <input type="text" id="loginUsername" placeholder="أدخل اسم المستخدم (admin)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-red-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">كلمة المرور:</label>
+                    <input type="password" id="loginPassword" placeholder="أدخل كلمة المرور (1234)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-red-500 focus:outline-none">
+                </div>
+                <p id="loginErrorMsg" class="text-xs text-red-600 font-semibold text-center hidden"></p>
+                <button onclick="handleLogin()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-red-600/20 text-xs">
+                    تسجيل الدخول
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- القائمة الجانبية (Sidebar) -->
+    <aside id="mainSidebar" class="w-full md:w-72 bg-slate-900 text-slate-300 flex flex-col justify-between shadow-2xl z-40 hidden-system">
+        <div>
+            <div class="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-red-600 text-white p-2.5 rounded-xl shadow-lg shadow-red-600/30">
+                        <i class="fa-solid fa-droplet text-xl animate-pulse"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-sm sm:text-base font-bold text-white tracking-wide">النظام الاحصائي الطبي</h1>
+                        <span class="text-[11px] text-slate-400 font-medium" id="permissionRoleText">المستخدم الحالي</span>
+                    </div>
+                </div>
+                <button onclick="handleLogout()" title="تسجيل خروج" class="text-slate-400 hover:text-red-400 transition p-2">
+                    <i class="fa-solid fa-power-off text-base"></i>
+                </button>
+            </div>
+
+            <!-- أزرار التنقل (تتغير بناءً على صلاحيات المستخدم) -->
+            <nav class="p-3 sm:p-4 space-y-1.5 overflow-x-auto md:overflow-visible flex md:block gap-2 md:gap-0" id="sidebarNav">
+                <button onclick="switchTab('statsTab')" id="btn-statsTab" class="w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition bg-red-600 text-white shadow-md shadow-red-600/20 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i> لوحة المؤشرات
+                </button>
+                <button onclick="switchTab('formTab')" id="btn-formTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-file-circle-plus w-5 text-center"></i> إدخال العمليات
+                </button>
+                <button onclick="switchTab('tableTab')" id="btn-tableTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-table-list w-5 text-center"></i> السجلات والعمليات
+                </button>
+                <button onclick="switchTab('archiveTab')" id="btn-archiveTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-box-archive w-5 text-center"></i> أرشيف السجلات
+                </button>
+                <button onclick="switchTab('reportsTab')" id="btn-reportsTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-file-lines w-5 text-center"></i> التقارير الشاملة
+                </button>
+                <button onclick="switchTab('branchesTab')" id="btn-branchesTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-building-shield w-5 text-center"></i> الفروع والمستفيدين
+                </button>
+                <button onclick="switchTab('typesTab')" id="btn-typesTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-sitemap w-5 text-center"></i> شجرة الحسابات
+                </button>
+                <button onclick="switchTab('usersTab')" id="btn-usersTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-users-gear w-5 text-center"></i> المستخدمين والصلاحيات
+                </button>
+                <button onclick="switchTab('backupTab')" id="btn-backupTab" class="nav-tab-btn w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap">
+                    <i class="fa-solid fa-database w-5 text-center"></i> النسخ الاحتياطي
+                </button>
+            </nav>
+        </div>
+
+        <div class="p-4 border-t border-slate-800 text-xs text-slate-400 hidden md:flex justify-between items-center bg-slate-950/40">
+            <span>التاريخ: <strong id="currentDateHeader" class="text-slate-200"></strong></span>
+            <span class="bg-red-950 text-red-400 px-2 py-0.5 rounded font-bold border border-red-900">ERP v9.9</span>
+        </div>
+    </aside>
+
+    <!-- المحتوى الرئيسي -->
+    <main id="mainAppContent" class="flex-1 p-3 sm:p-6 md:p-8 overflow-y-auto max-h-screen hidden-system">
+
+        <!-- 1. لوحة المؤشرات -->
+        <div id="statsTab" class="tab-content space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div>
+                    <h2 class="font-bold text-base sm:text-lg text-slate-800"><i class="fa-solid fa-chart-column text-red-600 ml-2"></i> مؤشرات الأداء والأرصدة</h2>
+                    <p class="text-xs text-slate-500">تحليل فوري لكميات الوحدات والحركات حسب الأنواع والحالات.</p>
+                </div>
+                <button onclick="loadAggregatedStats()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate"></i> تحديث
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="statsContainer"></div>
+        </div>
+
+        <!-- 2. إدخال العمليات اليومية (على طريقة الأنظمة المحاسبية مع زر حفظ علوي بأيقونة وتلميح) -->
+        <div id="formTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 max-w-4xl mx-auto">
+            <form id="bloodForm" onsubmit="submitBloodForm(event)">
+                <!-- شريط علوي محاسبي يحتوي على العنوان وأيقونة الحفظ والترحيل -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 border-b pb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-red-50 text-red-600 p-2.5 rounded-xl border border-red-100">
+                            <i class="fa-solid fa-file-circle-plus text-lg"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-base sm:text-lg text-slate-800">إدخال سند حركة عملية جديدة</h2>
+                            <p class="text-xs text-slate-500">رقم السند الآلي: <span id="autoCodePreview" class="text-red-600 font-mono font-bold tracking-wider">---</span></p>
+                        </div>
+                    </div>
+                    
+                    <!-- زر الحفظ والترحيل العلوي مع Tooltip -->
+                    <div class="tooltip-wrap">
+                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white w-12 h-12 rounded-xl flex items-center justify-center transition shadow-md shadow-red-600/30 text-base">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                        </button>
+                        <div class="tooltip-box">حفظ وترحيل السجل</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 bg-slate-50/50 p-4 rounded-2xl border border-slate-200">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">التاريخ الميلادي:</label>
+                        <input type="date" id="gregorianDate" required 
+                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <p class="text-xs text-red-600 mt-1 font-semibold" id="hijriPreview"></p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">العدد / الكمية (وحدات):</label>
+                        <input type="number" id="operationCount" min="1" value="1" required 
+                               class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none font-bold">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">القسم الرئيسي (شجرة الحسابات):</label>
+                        <select id="mainCategorySelect" onchange="onMainCategoryChange()" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none font-bold text-red-700">
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">البند الفرعي (الصنف):</label>
+                        <select id="subCategorySelect" onchange="onSubCategoryChange()" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none font-bold">
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">نوع التحليل / الفحص:</label>
+                        <select id="analysisTypeSelect" onchange="onAnalysisTypeChange()" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none font-bold">
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">حالة / نوع الوحدات:</label>
+                        <select id="typeSelect" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none font-bold text-indigo-700">
+                             <option value="ذكور">ذكور</option>
+                            <option value="إناث">إناث</option>
+                            <option value="مقطوفة">مقطوفة</option>
+                            <option value="غير مقطوفة">غير مقطوفة</option>
+                            <option value="سليمة">سليمة </option>
+                            <option value="غيرسليمة">غيرسليمة </option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">التفاصيل الدقيقة / الجهة:</label>
+                        <select id="analysisSelect" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none font-bold">
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 3. السجلات والعمليات (مع أيقونات وتلميحات Tooltip للأزرار) -->
+        <div id="tableTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 no-print">
+                <div class="relative w-full md:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" onkeyup="filterTableData()" placeholder="بحث سريع في السجلات والأكواد..." 
+                           class="w-full bg-white border border-slate-300 rounded-lg pr-9 pl-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                    <!-- زر طباعة بأيقونة وتلميح -->
+                    <div class="tooltip-wrap">
+                        <button onclick="printTable()" class="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 w-10 h-10 rounded-lg flex items-center justify-center transition">
+                            <i class="fa-solid fa-print text-slate-600"></i>
+                        </button>
+                        <div class="tooltip-box">طباعة الجدول</div>
+                    </div>
+
+                    <!-- زر ترحيل للأرشيف بأيقونة وتلميح -->
+                    <div class="tooltip-wrap">
+                        <button onclick="archiveSelectedRecords()" id="btnArchiveSelected" disabled class="bg-amber-50 border border-amber-200 text-amber-400 w-10 h-10 rounded-lg flex items-center justify-center transition cursor-not-allowed">
+                            <i class="fa-solid fa-box-archive"></i>
+                        </button>
+                        <div class="tooltip-box">ترحيل للأرشيف</div>
+                    </div>
+
+                    <!-- زر تعديل بأيقونة وتلميح -->
+                    <div class="tooltip-wrap">
+                        <button onclick="openEditModalForSelected()" id="btnEditSelected" disabled class="bg-white border border-slate-200 text-slate-300 w-10 h-10 rounded-lg flex items-center justify-center transition cursor-not-allowed">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <div class="tooltip-box">تعديل السجل</div>
+                    </div>
+
+                    <!-- زر حذف بأيقونة وتلميح -->
+                    <div class="tooltip-wrap">
+                        <button onclick="deleteSelectedRecords()" id="btnDeleteSelected" disabled class="bg-red-50 border border-red-200 text-red-300 w-10 h-10 rounded-lg flex items-center justify-center transition cursor-not-allowed">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                        <div class="tooltip-box">حذف المحدد</div>
+                    </div>
+
+                    <button onclick="clearAllRecords()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition">
+                        تفريغ الكل
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-right text-xs whitespace-nowrap">
+                    <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3 w-10 text-center no-print"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)"></th>
+                            <th class="p-3">الرقم الكودي</th>
+                            <th class="p-3">التاريخ (م / هـ)</th>
+                            <th class="p-3 text-center">العدد</th>
+                            <th class="p-3">التسلسل الإداري (رئيسي ➔ فرعي ➔ تحليل ➔ الحالة ➔ تفاصيل)</th>
+                            <th class="p-3 text-center">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3.5 أرشيف السجلات -->
+        <div id="archiveTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
+            <div class="border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h2 class="font-bold text-base sm:text-lg text-slate-800"><i class="fa-solid fa-box-archive text-amber-600 ml-2"></i> أرشيف السجلات والعمليات المرحلة</h2>
+                    <p class="text-xs text-slate-500">يعرض أدناه (النوع الفرعي والتحليل) فقط في السجلات المرحلة.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row justify-between items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 no-print">
+                <div class="relative w-full md:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="archiveSearchInput" onkeyup="filterArchiveData()" placeholder="بحث في الأرشيف..." 
+                           class="w-full bg-white border border-slate-300 rounded-lg pr-9 pl-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                    <button onclick="restoreSelectedArchive()" id="btnRestoreArchive" disabled class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-not-allowed">
+                        <i class="fa-solid fa-rotate-left"></i> استعادة للسجلات النشطة
+                    </button>
+                    <button onclick="deleteSelectedArchive()" id="btnDeleteArchive" disabled class="bg-red-50 border border-red-200 text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-not-allowed">
+                        <i class="fa-solid fa-trash-can"></i> حذف نهائي
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-right text-xs whitespace-nowrap">
+                    <thead class="bg-amber-50 text-amber-900 uppercase font-bold border-b border-amber-200">
+                        <tr>
+                            <th class="p-3 w-10 text-center no-print"><input type="checkbox" id="selectAllArchiveCheckbox" onclick="toggleSelectAllArchive(this)"></th>
+                            <th class="p-3 font-bold text-amber-900">النوع الفرعي (الصنف)</th>
+                            <th class="p-3 font-bold text-amber-900">التحليل / التفاصيل</th>
+                        </tr>
+                    </thead>
+                    <tbody id="archiveTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4. التقارير الشاملة المتقدمة -->
+        <div id="reportsTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-6">
+            <div class="border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h2 class="font-bold text-base sm:text-lg text-slate-800"><i class="fa-solid fa-file-lines text-red-600 ml-2"></i> التقارير الشاملة حسب الهيكل والتواريخ</h2>
+                    <p class="text-xs text-slate-500">استخراج تقارير مخصصة باستخدام القسم الرئيسي، الفرعي، بند التحليل، ونطاق زمني.</p>
+                </div>
+                <button onclick="printReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 no-print">
+                    <i class="fa-solid fa-print"></i> طباعة التقرير
+                </button>
+            </div>
+
+            <!-- فلاتر التقارير -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">القسم الرئيسي:</label>
+                    <select id="repMainSelect" onchange="onRepMainChange()" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-red-700">
+                        <option value="all">-- كل الأقسام الرئيسية --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">البند الفرعي (الصنف):</label>
+                    <select id="repSubSelect" onchange="onRepSubChange()" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold">
+                        <option value="all">-- كل البنود الفرعية --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">نوع التحليل / الفحص:</label>
+                    <select id="repAnalysisTypeSelect" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold">
+                        <option value="all">-- كل أنواع التحليل --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">حالة / نوع الوحدات:</label>
+                    <select id="repStatusFilter" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700">
+                        <option value="all">-- كل الحالات --</option>
+                        <option value="ذكور">ذكور</option>
+                        <option value="إناث">إناث</option>
+                        <option value="مقطوفة">مقطوفة</option>
+                        <option value="غير مقطوفة">غير مقطوفة</option>
+                        <option value="سليمة">سليمة</option>
+                        <option value="غيرسليمة">غيرسليمة</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">نوع التقويم للفلترة:</label>
+                    <select id="repCalendarType" onchange="toggleCalendarTypeInputs()" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700">
+                        <option value="gregorian">التقويم الميلادي (من تاريخ إلى تاريخ)</option>
+                        <option value="hijri">التقويم الهجري (من تاريخ إلى تاريخ)</option>
+                    </select>
+                </div>
+
+                <div id="gregorianDateInputs" class="md:col-span-2 grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">من تاريخ ميلادي:</label>
+                        <input type="date" id="repFromGregorian" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">إلى تاريخ ميلادي:</label>
+                        <input type="date" id="repToGregorian" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs">
+                    </div>
+                </div>
+
+                <div class="md:col-span-3 flex justify-end gap-2 pt-2 border-t">
+                    <button onclick="generateComprehensiveReport()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                        <i class="fa-solid fa-filter"></i> تنفيذ وعرض التقرير
+                    </button>
+                    <button onclick="resetReportFilters()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition">
+                        إعادة ضبط
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-red-700 font-bold block">إجمالي عدد العمليات المفلترة:</span>
+                        <strong id="repTotalCount" class="text-lg text-red-900">0</strong> سجل
+                    </div>
+                    <i class="fa-solid fa-list-check text-red-400 text-2xl"></i>
+                </div>
+                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-emerald-700 font-bold block">إجمالي كمية الوحدات:</span>
+                        <strong id="repTotalUnits" class="text-lg text-emerald-900">0</strong> وحدة
+                    </div>
+                    <i class="fa-solid fa-droplet text-emerald-400 text-2xl"></i>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-right text-xs whitespace-nowrap">
+                    <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3">الرقم الكودي</th>
+                            <th class="p-3">التاريخ (م / هـ)</th>
+                            <th class="p-3 text-center">العدد</th>
+                            <th class="p-3">القسم الرئيسي</th>
+                            <th class="p-3">البند الفرعي</th>
+                            <th class="p-3">نوع التحليل</th>
+                            <th class="p-3">الحالة / التفاصيل</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="divide-y divide-slate-100">
+                        <tr><td colspan="7" class="text-center p-6 text-slate-400">الرجاء تحديد معايير التقرير والضغط على "تنفيذ وعرض التقرير"</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 5. الفروع والمستفيدين (مع بحث، تعديل، حذف) -->
+        <div id="branchesTab" class="tab-content hidden space-y-6">
+            <div class="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 max-w-md no-print">
+                <button onclick="switchSubSection('branchesSub')" id="btn-branchesSub" class="flex-1 py-2 rounded-xl text-xs font-bold transition bg-red-600 text-white">
+                    بيانات الفروع
+                </button>
+                <button onclick="switchSubSection('beneficiariesSub')" id="btn-beneficiariesSub" class="flex-1 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    المستشفيات والمستفيدين
+                </button>
+            </div>
+
+            <!-- الفرع -->
+            <div id="branchesSub" class="sub-section-content bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
+                    <div class="relative w-full sm:w-80">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="branchSearchInput" onkeyup="filterBranchesTable()" placeholder="بحث في الفروع..." 
+                               class="w-full bg-slate-50 border border-slate-300 rounded-lg pr-9 pl-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+                    </div>
+                    <div class="flex items-center gap-2 no-print">
+                        <button onclick="openBranchModal()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">إضافة فرع</button>
+                        <button onclick="deleteSelectedBranches()" id="btnDeleteBranches" disabled class="bg-red-50 border border-red-200 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">حذف المحدد</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-right text-xs whitespace-nowrap">
+                        <thead class="bg-slate-100 text-slate-700 uppercase">
+                            <tr>
+                                <th class="p-3 w-10 text-center no-print"><input type="checkbox" id="selectAllBranches" onclick="toggleSelectAllItems(this, 'branch-checkbox', 'btnDeleteBranches')"></th>
+                                <th class="p-3">كود الفرع</th>
+                                <th class="p-3">اسم الفرع</th>
+                                <th class="p-3 text-center no-print">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="branchesTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- المستفيدين -->
+            <div id="beneficiariesSub" class="sub-section-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
+                    <div class="relative w-full sm:w-80">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="benSearchInput" onkeyup="filterBeneficiariesTable()" placeholder="بحث في المستشفيات..." 
+                               class="w-full bg-slate-50 border border-slate-300 rounded-lg pr-9 pl-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+                    </div>
+                    <div class="flex items-center gap-2 no-print">
+                        <button onclick="openBenModal()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">إضافة جهة</button>
+                        <button onclick="deleteSelectedBeneficiaries()" id="btnDeleteBens" disabled class="bg-red-50 border border-red-200 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">حذف المحدد</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-right text-xs whitespace-nowrap">
+                        <thead class="bg-slate-100 text-slate-700 uppercase">
+                            <tr>
+                                <th class="p-3 w-10 text-center no-print"><input type="checkbox" id="selectAllBens" onclick="toggleSelectAllItems(this, 'ben-checkbox', 'btnDeleteBens')"></th>
+                                <th class="p-3">كود الجهة</th>
+                                <th class="p-3">اسم المستشفى / الجهة المستفيدة</th>
+                                <th class="p-3 text-center no-print">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="beneficiariesTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. شجرة الحسابات (مع بحث، تعديل، حذف) -->
+        <div id="typesTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 no-print">
+                <div class="relative w-full md:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="typeSearchInput" onkeyup="filterTypesTable()" placeholder="بحث في شجرة الحسابات..." 
+                           class="w-full bg-white border border-slate-300 rounded-lg pr-9 pl-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+                </div>
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button onclick="openAddTypeModal()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">إضافة بند جديد</button>
+                    <button onclick="deleteSelectedTypes()" id="btnDeleteTypeSelected" disabled class="bg-red-50 border border-red-200 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed">حذف المحدد</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-right text-xs whitespace-nowrap">
+                    <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3 w-10 text-center no-print"><input type="checkbox" id="selectAllTypes" onclick="toggleSelectAllItems(this, 'type-checkbox', 'btnDeleteTypeSelected')"></th>
+                            <th class="p-3">كود البند الهرمي</th>
+                            <th class="p-3">القسم الرئيسي</th>
+                            <th class="p-3">البند الفرعي (الصنف)</th>
+                            <th class="p-3">نوع التحليل</th>
+                            <th class="p-3">التفاصيل الدقيقة</th>
+                            <th class="p-3 text-center no-print">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="typesTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 7. تبويب المستخدمين والصلاحيات (مع صلاحيات المنح والتبويبات، تعديل، حذف) -->
+        <div id="usersTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-6">
+            <div class="border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h2 class="font-bold text-base sm:text-lg text-slate-800"><i class="fa-solid fa-users-gear text-red-600 ml-2"></i> إدارة المستخدمين وصلاحيات المنح والتبويبات</h2>
+                    <p class="text-xs text-slate-500">تحكم بحسابات المستخدمين وصلاحيات الحذف/التعديل والوصول للتبويبات.</p>
+                </div>
+                <button onclick="openUserModal('add')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 no-print">
+                    <i class="fa-solid fa-user-plus"></i> إضافة مستخدم جديد
+                </button>
+            </div>
+
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-right text-xs whitespace-nowrap">
+                    <thead class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3">اسم المستخدم</th>
+                            <th class="p-3">كلمة المرور</th>
+                            <th class="p-3">نوع الصلاحية / المنح</th>
+                            <th class="p-3">التبويبات المسموحة</th>
+                            <th class="p-3 text-center">الحالة</th>
+                            <th class="p-3 text-center no-print">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 8. النسخ الاحتياطي -->
+        <div id="backupTab" class="tab-content hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
+            <div class="border-b pb-4">
+                <h2 class="font-bold text-base sm:text-lg text-slate-800"><i class="fa-solid fa-database text-red-600 ml-2"></i> إدارة النسخ الاحتياطي</h2>
+                <p class="text-xs text-slate-500">حفظ نسخة احتياطية من قواعد البيانات المحلية.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                    <h3 class="font-bold text-slate-800 text-sm">تصدير نسخة احتياطية (Backup)</h3>
+                    <button onclick="exportBackupFile()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-xs transition">تحميل الملف</button>
+                </div>
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                    <h3 class="font-bold text-slate-800 text-sm">استعادة البيانات (Restore)</h3>
+                    <input type="file" id="backupFileInput" accept=".json" class="w-full text-xs">
+                    <button onclick="importBackupFile()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs transition">استعادة</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-slate-200 text-center text-xs text-slate-500 no-print">
+            تصميم وتطوير: <span class="font-bold text-indigo-600">خلدون أحمد</span>
+        </div>
+    </main>
+
+    <!-- النوافذ المنبثقة (Modals) للفروع، المستفيدين، الشجرة، المستخدمين، والتعديل -->
+    
+    <!-- نافذة الفرع -->
+    <div id="branchModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-sm text-slate-800" id="branchModalTitle">إدارة الفرع</h3>
+                <button onclick="closeBranchModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="branchFormModal" onsubmit="saveBranchForm(event)" class="space-y-4">
+                <input type="hidden" id="editBranchIndex">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كود الفرع:</label>
+                    <input type="text" id="branchCode" readonly class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">اسم الفرع:</label>
+                    <input type="text" id="branchName" required placeholder="مثال: الفرع الرئيسي" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">حفظ الفرع</button>
+                    <button type="button" onclick="closeBranchModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة المستفيدين -->
+    <div id="benModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-sm text-slate-800" id="benModalTitle">إدارة المستشفى / الجهة</h3>
+                <button onclick="closeBenModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="benFormModal" onsubmit="saveBenForm(event)" class="space-y-4">
+                <input type="hidden" id="editBenIndex">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كود الجهة:</label>
+                    <input type="text" id="benCode" readonly class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">اسم المستشفى / الجهة:</label>
+                    <input type="text" id="benName" required placeholder="مثال: مستشفى الثورة العام" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">حفظ الجهة</button>
+                    <button type="button" onclick="closeBenModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة الشجرة -->
+    <div id="typeModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-sm text-slate-800" id="typeModalTitle">إدارة شجرة الحسابات</h3>
+                <button onclick="closeTypeModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="typeFormModal" onsubmit="saveTypeForm(event)" class="space-y-3">
+                <input type="hidden" id="editTypeIndex">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">القسم الرئيسي:</label>
+                    <select id="modalMainTypeSelect" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-red-700">
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">الكود الهرمي التلقائي:</label>
+                    <input type="text" id="modalAutoCode" readonly class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">البند الفرعي (الصنف):</label>
+                    <input type="text" id="modalSubType" required placeholder="مثال: متبرعون طوعيون" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">نوع التحليل:</label>
+                    <input type="text" id="modalAnalysisType" required placeholder="مثال: فحص فيروسات" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">التفاصيل الدقيقة:</label>
+                    <input type="text" id="modalDetail" required placeholder="مثال: تبرع سلبي" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div class="flex gap-2 pt-3 border-t">
+                    <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">حفظ البند</button>
+                    <button type="button" onclick="closeTypeModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة المستخدمين والصلاحيات -->
+    <div id="userModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-sm text-slate-800" id="userModalTitle">إدارة المستخدم وصلاحيات المنح</h3>
+                <button onclick="closeUserModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="userFormModal" onsubmit="saveUserForm(event)" class="space-y-4">
+                <input type="hidden" id="editUserIndex">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">اسم المستخدم:</label>
+                    <input type="text" id="newUsername" required placeholder="مثال: ahmed" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور:</label>
+                    <input type="password" id="newUserPass" required placeholder="••••••••" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">نوع الصلاحية العامة:</label>
+                    <select id="newUserRole" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-red-700">
+                        <option value="مشرف النظام">مشرف النظام (صلاحيات كاملة)</option>
+                        <option value="موظف ادخال">موظف إدخال وحركات</option>
+                    </select>
+                </div>
+
+                <!-- مؤشرات المنح (تعديل وحذف) -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <span class="block text-xs font-bold text-slate-700 mb-1">صلاحيات المنح الإضافية:</span>
+                    <label class="flex items-center gap-2 text-xs cursor-pointer">
+                        <input type="checkbox" id="permEdit" class="rounded text-red-600 focus:ring-red-500"> تفعيل صلاحية التعديل
+                    </label>
+                    <label class="flex items-center gap-2 text-xs cursor-pointer">
+                        <input type="checkbox" id="permDelete" class="rounded text-red-600 focus:ring-red-500"> تفعيل صلاحية الحذف
+                    </label>
+                </div>
+
+                <!-- صلاحيات الوصول للتبويبات -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <span class="block text-xs font-bold text-slate-700 mb-1">التبويبات المسموح بالوصول إليها:</span>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="statsTab" class="user-tab-perm rounded"> لوحة المؤشرات</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="formTab" class="user-tab-perm rounded"> إدخال العمليات</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="tableTab" class="user-tab-perm rounded"> السجلات والعمليات</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="archiveTab" class="user-tab-perm rounded"> أرشيف السجلات</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="reportsTab" class="user-tab-perm rounded"> التقارير الشاملة</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="branchesTab" class="user-tab-perm rounded"> الفروع والمستفيدين</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="typesTab" class="user-tab-perm rounded"> شجرة الحسابات</label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="usersTab" class="user-tab-perm rounded"> المستخدمين وصلاحيات</label>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">حفظ المستخدم</button>
+                    <button type="button" onclick="closeUserModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل السجلات اليومية -->
+    <div id="editModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-sm text-slate-800"><i class="fa-solid fa-pen-to-square text-red-600 ml-1"></i> تعديل بيانات السجل</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="editRecordId">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">العدد / الكمية:</label>
+                    <input type="number" id="editCount" min="1" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">التفاصيل:</label>
+                    <input type="text" id="editAnalysis" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold">
+                </div>
+            </div>
+            <div class="flex gap-2 pt-3 border-t">
+                <button onclick="saveEditedRecord()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">حفظ التعديلات</button>
+                <button onclick="closeEditModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- المنطق البرمجي (JavaScript) -->
+    <script>
+        const defaultSystemStructureV98 = [
+            { code: "100", main: "1- إحصاءات التبرع بالدم", sub: "إجمالي المتبرعين", analysisType: "عام", detail: "تبرع كامل" },
+            { code: "101", main: "1- إحصاءات التبرع بالدم", sub: "متبرعون طوعيون", analysisType: "فحص فيروسات", detail: "تبرع سلبي" },
+            { code: "200", main: "2- إحصاءات السحب", sub: "إجمالي عمليات السحب", analysisType: "عام", detail: "قسم العمليات" },
+            { code: "300", main: "3- إحصاءات مكونات الفصل", sub: "إجمالي وحدات الدم المفصولة", analysisType: "عام", detail: "وحدة فصل" },
+            { code: "400", main: "4- إحصاءات الفحوصات المخبرية", sub: "إجمالي الفحوصات المخبرية", analysisType: "عام", detail: "مختبر" },
+            { code: "500", main: "5- إحصاءات المخزون والصرف", sub: "إجمالي الوحدات المنصرفة", analysisType: "صرف", detail: "مستشفيات" }
+        ];
+
+        function getUsers() {
+            let storedUsers = localStorage.getItem('bloodBankUsersV9');
+            if (!storedUsers) {
+                let defaultUsers = [
+                    { username: "admin", pass: "1234", role: "مشرف النظام", canEdit: true, canDelete: true, allowedTabs: ['statsTab', 'formTab', 'tableTab', 'archiveTab', 'reportsTab', 'branchesTab', 'typesTab', 'usersTab', 'backupTab'] }
+                ];
+                localStorage.setItem('bloodBankUsersV9', JSON.stringify(defaultUsers));
+                return defaultUsers;
+            }
+            return JSON.parse(storedUsers);
+        }
+
+        function getSystemStructure() {
+            let stored = localStorage.getItem('bloodBankSystemStructureV98');
+            if (!stored) {
+                localStorage.setItem('bloodBankSystemStructureV98', JSON.stringify(defaultSystemStructureV98));
+                return defaultSystemStructureV98;
+            }
+            return JSON.parse(stored);
+        }
+
+        function getBranches() {
+            return JSON.parse(localStorage.getItem('bloodBankBranchesV9')) || [{ code: "BR-001", name: "بنك الدم الرئيسي" }];
+        }
+
+        function getBeneficiaries() {
+            return JSON.parse(localStorage.getItem('bloodBankBeneficiariesV9')) || [{ code: "HOSP-001", name: "مستشفى الثورة العام" }];
+        }
+
+        function handleLogin() {
+            let inputUser = document.getElementById('loginUsername').value.trim();
+            let inputPass = document.getElementById('loginPassword').value.trim();
+            let errBox = document.getElementById('loginErrorMsg');
+
+            let users = getUsers();
+            let foundUser = users.find(u => u.username === inputUser && u.pass === inputPass);
+
+            if (foundUser) {
+                localStorage.setItem('bloodBankCurrentUser', JSON.stringify(foundUser));
+                applyUserPermissions(foundUser);
+                document.getElementById('loginScreen').classList.add('hidden-system');
+                document.getElementById('mainSidebar').classList.remove('hidden-system');
+                document.getElementById('mainAppContent').classList.remove('hidden-system');
+                
+                document.getElementById('gregorianDate').valueAsDate = new Date();
+                updateHijriPreview();
+                populateOperationMainCategories();
+                document.getElementById('currentDateHeader').innerText = moment().format('YYYY/MM/DD');
+                loadAggregatedStats();
+            } else {
+                errBox.innerText = "اسم المستخدم أو كلمة المرور غير صحيحة!";
+                errBox.classList.remove('hidden-system');
+            }
+        }
+
+        function applyUserPermissions(userObj) {
+            let roleText = document.getElementById('permissionRoleText');
+            roleText.innerText = `${userObj.username} (${userObj.role})`;
+
+            // تفعيل أو إخفاء التتبويبات بناءً على صلاحيات المستخدم
+            let navButtons = document.querySelectorAll('#sidebarNav button');
+            navButtons.forEach(btn => {
+                let onclickAttr = btn.getAttribute('onclick') || '';
+                let match = onclickAttr.match(/switchTab\('(.*?)'\)/);
+                if (match && match[1]) {
+                    let tabName = match[1];
+                    if (userObj.username === 'admin' || !userObj.allowedTabs || userObj.allowedTabs.includes(tabName)) {
+                        btn.style.display = 'flex';
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('bloodBankCurrentUser');
+            location.reload();
+        }
+
+        window.onload = function() {
+            getUsers();
+            let activeUserStr = localStorage.getItem('bloodBankCurrentUser');
+            if (activeUserStr) {
+                let activeUser = JSON.parse(activeUserStr);
+                applyUserPermissions(activeUser);
+                document.getElementById('loginScreen').classList.add('hidden-system');
+                document.getElementById('mainSidebar').classList.remove('hidden-system');
+                document.getElementById('mainAppContent').classList.remove('hidden-system');
+                
+                document.getElementById('gregorianDate').valueAsDate = new Date();
+                updateHijriPreview();
+                populateOperationMainCategories();
+                document.getElementById('currentDateHeader').innerText = moment().format('YYYY/MM/DD');
+                loadAggregatedStats();
+            }
+        };
+
+        document.getElementById('gregorianDate').addEventListener('change', updateHijriPreview);
+
+        function updateHijriPreview() {
+            let gDate = document.getElementById('gregorianDate').value;
+            if (gDate) {
+                document.getElementById('hijriPreview').innerText = `الموافق هجرياً: ${moment(gDate, 'YYYY-MM-DD').format('iYYYY/iM/iD')} هـ`;
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+
+            ['statsTab', 'formTab', 'tableTab', 'archiveTab', 'reportsTab', 'branchesTab', 'typesTab', 'usersTab', 'backupTab'].forEach(id => {
+                let btn = document.getElementById('btn-' + id);
+                if (btn) {
+                    btn.className = id === tabId ? 
+                        "w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition bg-red-600 text-white shadow-md shadow-red-600/20 whitespace-nowrap" : 
+                        "w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs md:text-sm font-semibold transition hover:bg-slate-800 text-slate-300 whitespace-nowrap";
+                }
+            });
+
+            if (tabId === 'statsTab') loadAggregatedStats();
+            if (tabId === 'tableTab') loadTableData();
+            if (tabId === 'archiveTab') loadArchiveData();
+            if (tabId === 'reportsTab') initReportFilters();
+            if (tabId === 'branchesTab') { refreshBranchesTable(); refreshBeneficiariesTable(); }
+            if (tabId === 'typesTab') refreshTypesManagementUI();
+            if (tabId === 'usersTab') refreshUsersTable();
+        }
+
+        function switchSubSection(subId) {
+            document.querySelectorAll('.sub-section-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(subId).classList.remove('hidden');
+            ['branchesSub', 'beneficiariesSub'].forEach(id => {
+                let btn = document.getElementById('btn-' + id);
+                if(btn) btn.className = id === subId ? "flex-1 py-2 rounded-xl text-xs font-bold transition bg-red-600 text-white" : "flex-1 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-600";
+            });
+        }
+
+        // دالة حفظ السجل من الزر العلوي المحاسبي
+        function submitBloodForm(e) {
+            e.preventDefault();
+            let record = {
+                id: 'REC-' + Date.now(),
+                autoCode: document.getElementById('autoCodePreview').innerText,
+                gDate: document.getElementById('gregorianDate').value,
+                hDate: moment(document.getElementById('gregorianDate').value, 'YYYY-MM-DD').format('iYYYY/iM/iD'),
+                opCount: parseInt(document.getElementById('operationCount').value) || 1,
+                mainCategory: document.getElementById('mainCategorySelect').value,
+                subCategory: document.getElementById('subCategorySelect').value,
+                analysisType: document.getElementById('analysisTypeSelect').value,
+                typeField: document.getElementById('typeSelect').value,
+                analysis: document.getElementById('analysisSelect').value
+            };
+
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            records.unshift(record);
+            localStorage.setItem('bloodBankRecordsV98', JSON.stringify(records));
+
+            document.getElementById('operationCount').value = 1;
+            onMainCategoryChange();
+            alert(`تم حفظ وترحيل السجل بنجاح برقم كودي: ${record.autoCode}`);
+        }
+
+        function populateOperationMainCategories() {
+            let structure = getSystemStructure();
+            let select = document.getElementById('mainCategorySelect');
+            select.innerHTML = '';
+            let mainCategories = [...new Set(structure.map(s => s.main))];
+            mainCategories.forEach(main => {
+                let opt = document.createElement('option');
+                opt.value = main;
+                opt.textContent = main;
+                select.appendChild(opt);
+            });
+            onMainCategoryChange();
+        }
+
+        function onMainCategoryChange() {
+            let mainCat = document.getElementById('mainCategorySelect').value;
+            let structure = getSystemStructure();
+            let subSelect = document.getElementById('subCategorySelect');
+            subSelect.innerHTML = '';
+            let matchedSubs = [...new Set(structure.filter(s => s.main === mainCat).map(s => s.sub))];
+            matchedSubs.forEach(sub => {
+                let opt = document.createElement('option');
+                opt.value = sub;
+                opt.textContent = sub;
+                subSelect.appendChild(opt);
+            });
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            document.getElementById('autoCodePreview').innerText = `OPS-${String(records.length + 1).padStart(4, '0')}`;
+            onSubCategoryChange();
+        }
+
+        function onSubCategoryChange() {
+            let mainCat = document.getElementById('mainCategorySelect').value;
+            let subCat = document.getElementById('subCategorySelect').value;
+            let structure = getSystemStructure();
+            let analysisTypeSelect = document.getElementById('analysisTypeSelect');
+            analysisTypeSelect.innerHTML = '';
+            let matchedTypes = [...new Set(structure.filter(s => s.main === mainCat && s.sub === subCat).map(s => s.analysisType))];
+            matchedTypes.forEach(t => {
+                let opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                analysisTypeSelect.appendChild(opt);
+            });
+            onAnalysisTypeChange();
+        }
+
+        function onAnalysisTypeChange() {
+            let mainCat = document.getElementById('mainCategorySelect').value;
+            let subCat = document.getElementById('subCategorySelect').value;
+            let analysisType = document.getElementById('analysisTypeSelect').value;
+            let structure = getSystemStructure();
+            let analysisSelect = document.getElementById('analysisSelect');
+            analysisSelect.innerHTML = '';
+            let matchedDetails = structure.filter(s => s.main === mainCat && s.sub === subCat && s.analysisType === analysisType).map(s => s.detail);
+            matchedDetails.forEach(d => {
+                let opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                analysisSelect.appendChild(opt);
+            });
+        }
+
+        // السجلات والعمليات والتعديل والحذف والترحيل
+        function loadTableData() {
+            let tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            if (records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">لا توجد سجلات مسجلة</td></tr>`;
+                return;
+            }
+            records.forEach(rec => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 text-center no-print"><input type="checkbox" class="row-checkbox" value="${rec.id}" onclick="updateToolbarState()"></td>
+                        <td class="p-3 font-bold text-red-600">${rec.autoCode}</td>
+                        <td class="p-3">${rec.gDate}</td>
+                        <td class="p-3 font-bold text-center bg-red-50 text-red-700">${rec.opCount}</td>
+                        <td class="p-3 font-medium text-slate-800">${rec.mainCategory} ➔ ${rec.subCategory} ➔ [${rec.typeField}] ➔ ${rec.analysis}</td>
+                        <td class="p-3 text-center"><span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold">مكتمل</span></td>
+                    </tr>`;
+            });
+            updateToolbarState();
+        }
+
+        function toggleSelectAll(master) {
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = master.checked);
+            updateToolbarState();
+        }
+
+        function updateToolbarState() {
+            let checkedCount = document.querySelectorAll('.row-checkbox:checked').length;
+            let btnEdit = document.getElementById('btnEditSelected');
+            let btnDelete = document.getElementById('btnDeleteSelected');
+            let btnArchive = document.getElementById('btnArchiveSelected');
+
+            let currentUser = JSON.parse(localStorage.getItem('bloodBankCurrentUser') || '{}');
+
+            if (checkedCount > 0) {
+                if (currentUser.canEdit !== false) {
+                    btnEdit.disabled = checkedCount !== 1;
+                    btnEdit.className = checkedCount === 1 ? "bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 w-10 h-10 rounded-lg flex items-center justify-center transition" : "bg-white border border-slate-200 text-slate-300 w-10 h-10 rounded-lg flex items-center justify-center cursor-not-allowed";
+                }
+                if (currentUser.canDelete !== false) {
+                    btnDelete.disabled = false;
+                    btnDelete.className = "bg-red-600 hover:bg-red-700 text-white w-10 h-10 rounded-lg flex items-center justify-center transition";
+                }
+                btnArchive.disabled = false;
+                btnArchive.className = "bg-amber-600 hover:bg-amber-700 text-white w-10 h-10 rounded-lg flex items-center justify-center transition";
+            } else {
+                btnEdit.disabled = true;
+                btnEdit.className = "bg-white border border-slate-200 text-slate-300 w-10 h-10 rounded-lg flex items-center justify-center cursor-not-allowed";
+                btnDelete.disabled = true;
+                btnDelete.className = "bg-red-50 border border-red-200 text-red-300 w-10 h-10 rounded-lg flex items-center justify-center cursor-not-allowed";
+                btnArchive.disabled = true;
+                btnArchive.className = "bg-amber-50 border border-amber-200 text-amber-300 w-10 h-10 rounded-lg flex items-center justify-center cursor-not-allowed";
+            }
+        }
+
+        function openEditModalForSelected() {
+            let checked = document.querySelector('.row-checkbox:checked');
+            if (!checked) return;
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            let rec = records.find(r => r.id === checked.value);
+            if (!rec) return;
+
+            document.getElementById('editRecordId').value = rec.id;
+            document.getElementById('editCount').value = rec.opCount;
+            document.getElementById('editAnalysis').value = rec.analysis;
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+        function saveEditedRecord() {
+            let id = document.getElementById('editRecordId').value;
+            let count = parseInt(document.getElementById('editCount').value) || 1;
+            let analysis = document.getElementById('editAnalysis').value.trim();
+
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            let rec = records.find(r => r.id === id);
+            if (rec) {
+                rec.opCount = count;
+                rec.analysis = analysis;
+                localStorage.setItem('bloodBankRecordsV98', JSON.stringify(records));
+                closeEditModal();
+                loadTableData();
+                alert('تم تعديل السجل بنجاح');
+            }
+        }
+
+        function deleteSelectedRecords() {
+            let selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+            if (selectedIds.length === 0) return;
+            if (confirm(`هل أنت متأكد من حذف السجلات المحددة؟`)) {
+                let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+                records = records.filter(r => !selectedIds.includes(r.id));
+                localStorage.setItem('bloodBankRecordsV98', JSON.stringify(records));
+                loadTableData();
+            }
+        }
+
+        function archiveSelectedRecords() {
+            let selectedIds = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+            if (selectedIds.length === 0) return;
+            if (confirm(`هل أنت متأكد من ترحيل السجلات إلى الأرشيف؟`)) {
+                let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+                let archive = JSON.parse(localStorage.getItem('bloodBankArchiveV98')) || [];
+                let toArchive = records.filter(r => selectedIds.includes(r.id));
+                let remaining = records.filter(r => !selectedIds.includes(r.id));
+                archive.unshift(...toArchive);
+                localStorage.setItem('bloodBankRecordsV98', JSON.stringify(remaining));
+                localStorage.setItem('bloodBankArchiveV98', JSON.stringify(archive));
+                loadTableData();
+                alert('تم الترحيل للأرشيف بنجاح.');
+            }
+        }
+
+        function loadArchiveData() {
+            let tbody = document.getElementById('archiveTableBody');
+            tbody.innerHTML = '';
+            let archive = JSON.parse(localStorage.getItem('bloodBankArchiveV98')) || [];
+            if (archive.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center p-6 text-slate-400">الأرشيف فارغ حالياً</td></tr>`;
+                return;
+            }
+            archive.forEach(rec => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 text-center no-print"><input type="checkbox" class="archive-checkbox" value="${rec.id}"></td>
+                        <td class="p-3 font-bold text-amber-700">${rec.subCategory}</td>
+                        <td class="p-3 font-medium text-slate-800">${rec.analysis} (${rec.analysisType})</td>
+                    </tr>`;
+            });
+        }
+
+        // الفروع (إضافة، تعديل، حذف، بحث)
+        function openBranchModal(index = null) {
+            let branches = getBranches();
+            if (index !== null) {
+                document.getElementById('branchModalTitle').innerText = 'تعديل الفرع';
+                document.getElementById('editBranchIndex').value = index;
+                document.getElementById('branchCode').value = branches[index].code;
+                document.getElementById('branchName').value = branches[index].name;
+            } else {
+                document.getElementById('branchModalTitle').innerText = 'إضافة فرع جديد';
+                document.getElementById('editBranchIndex').value = '';
+                document.getElementById('branchCode').value = `BR-${String(branches.length + 1).padStart(3, '0')}`;
+                document.getElementById('branchName').value = '';
+            }
+            document.getElementById('branchModal').classList.remove('hidden');
+        }
+        function closeBranchModal() { document.getElementById('branchModal').classList.add('hidden'); }
+
+        function saveBranchForm(e) {
+            e.preventDefault();
+            let branches = getBranches();
+            let idx = document.getElementById('editBranchIndex').value;
+            let name = document.getElementById('branchName').value.trim();
+            if (idx === "") {
+                branches.push({ code: document.getElementById('branchCode').value, name: name });
+            } else {
+                branches[idx].name = name;
+            }
+            localStorage.setItem('bloodBankBranchesV9', JSON.stringify(branches));
+            closeBranchModal();
+            refreshBranchesTable();
+            alert('تم حفظ الفرع بنجاح!');
+        }
+
+        function refreshBranchesTable() {
+            let tbody = document.getElementById('branchesTableBody');
+            tbody.innerHTML = '';
+            getBranches().forEach((b, idx) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-3 text-center no-print"><input type="checkbox" class="branch-checkbox" value="${idx}" onclick="updateItemToolbar('branch-checkbox', 'btnDeleteBranches')"></td>
+                        <td class="p-3 font-bold text-red-600">${b.code}</td>
+                        <td class="p-3">${b.name}</td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="openBranchModal(${idx})" class="text-indigo-600 hover:underline ml-2">تعديل</button>
+                            <button onclick="deleteSingleBranch(${idx})" class="text-red-500 hover:underline">حذف</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function deleteSingleBranch(idx) {
+            if(confirm('هل أنت متأكد من الحذف؟')) {
+                let branches = getBranches();
+                branches.splice(idx, 1);
+                localStorage.setItem('bloodBankBranchesV9', JSON.stringify(branches));
+                refreshBranchesTable();
+            }
+        }
+
+        function deleteSelectedBranches() {
+            let selected = Array.from(document.querySelectorAll('.branch-checkbox:checked')).map(cb => parseInt(cb.value));
+            if(selected.length === 0) return;
+            if(confirm('هل أنت متأكد من حذف الفروع المحددة؟')) {
+                let branches = getBranches().filter((_, i) => !selected.includes(i));
+                localStorage.setItem('bloodBankBranchesV9', JSON.stringify(branches));
+                refreshBranchesTable();
+            }
+        }
+
+        function filterBranchesTable() {
+            let query = document.getElementById('branchSearchInput').value.toLowerCase();
+            document.querySelectorAll('#branchesTableBody tr').forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+            });
+        }
+
+        // المستفيدين (إضافة، تعديل، حذف، بحث)
+        function openBenModal(index = null) {
+            let bens = getBeneficiaries();
+            if (index !== null) {
+                document.getElementById('benModalTitle').innerText = 'تعديل جهة الاستفادة';
+                document.getElementById('editBenIndex').value = index;
+                document.getElementById('benCode').value = bens[index].code;
+                document.getElementById('benName').value = bens[index].name;
+            } else {
+                document.getElementById('benModalTitle').innerText = 'إضافة مستشفى / جهة جديدة';
+                document.getElementById('editBenIndex').value = '';
+                document.getElementById('benCode').value = `HOSP-${String(bens.length + 1).padStart(3, '0')}`;
+                document.getElementById('benName').value = '';
+            }
+            document.getElementById('benModal').classList.remove('hidden');
+        }
+        function closeBenModal() { document.getElementById('benModal').classList.add('hidden'); }
+
+        function saveBenForm(e) {
+            e.preventDefault();
+            let bens = getBeneficiaries();
+            let idx = document.getElementById('editBenIndex').value;
+            let name = document.getElementById('benName').value.trim();
+            if (idx === "") {
+                bens.push({ code: document.getElementById('benCode').value, name: name });
+            } else {
+                bens[idx].name = name;
+            }
+            localStorage.setItem('bloodBankBeneficiariesV9', JSON.stringify(bens));
+            closeBenModal();
+            refreshBeneficiariesTable();
+            alert('تم حفظ الجهة بنجاح!');
+        }
+
+        function refreshBeneficiariesTable() {
+            let tbody = document.getElementById('beneficiariesTableBody');
+            tbody.innerHTML = '';
+            getBeneficiaries().forEach((b, idx) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-3 text-center no-print"><input type="checkbox" class="ben-checkbox" value="${idx}" onclick="updateItemToolbar('ben-checkbox', 'btnDeleteBens')"></td>
+                        <td class="p-3 font-bold text-red-600">${b.code}</td>
+                        <td class="p-3">${b.name}</td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="openBenModal(${idx})" class="text-indigo-600 hover:underline ml-2">تعديل</button>
+                            <button onclick="deleteSingleBen(${idx})" class="text-red-500 hover:underline">حذف</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function deleteSingleBen(idx) {
+            if(confirm('هل أنت متأكد من الحذف؟')) {
+                let bens = getBeneficiaries();
+                bens.splice(idx, 1);
+                localStorage.setItem('bloodBankBeneficiariesV9', JSON.stringify(bens));
+                refreshBeneficiariesTable();
+            }
+        }
+
+        function deleteSelectedBeneficiaries() {
+            let selected = Array.from(document.querySelectorAll('.ben-checkbox:checked')).map(cb => parseInt(cb.value));
+            if(selected.length === 0) return;
+            if(confirm('هل أنت متأكد من حذف الجهات المحددة؟')) {
+                let bens = getBeneficiaries().filter((_, i) => !selected.includes(i));
+                localStorage.setItem('bloodBankBeneficiariesV9', JSON.stringify(bens));
+                refreshBeneficiariesTable();
+            }
+        }
+
+        function filterBeneficiariesTable() {
+            let query = document.getElementById('benSearchInput').value.toLowerCase();
+            document.querySelectorAll('#beneficiariesTableBody tr').forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+            });
+        }
+
+        // شجرة الحسابات (إضافة، تعديل، حذف، بحث)
+        function openAddTypeModal(index = null) {
+            let structure = getSystemStructure();
+            let select = document.getElementById('modalMainTypeSelect');
+            select.innerHTML = '';
+            [...new Set(structure.map(s => s.main))].forEach(main => {
+                let opt = document.createElement('option');
+                opt.value = main;
+                opt.textContent = main;
+                select.appendChild(opt);
+            });
+
+            if (index !== null) {
+                document.getElementById('typeModalTitle').innerText = 'تعديل بند الشجرة';
+                document.getElementById('editTypeIndex').value = index;
+                document.getElementById('modalAutoCode').value = structure[index].code;
+                select.value = structure[index].main;
+                document.getElementById('modalSubType').value = structure[index].sub;
+                document.getElementById('modalAnalysisType').value = structure[index].analysisType;
+                document.getElementById('modalDetail').value = structure[index].detail;
+            } else {
+                document.getElementById('typeModalTitle').innerText = 'إضافة بند جديد للشجرة';
+                document.getElementById('editTypeIndex').value = '';
+                document.getElementById('modalAutoCode').value = structure.length + 100;
+                document.getElementById('modalSubType').value = '';
+                document.getElementById('modalAnalysisType').value = '';
+                document.getElementById('modalDetail').value = '';
+            }
+            document.getElementById('typeModal').classList.remove('hidden');
+        }
+        function closeTypeModal() { document.getElementById('typeModal').classList.add('hidden'); }
+
+        function saveTypeForm(e) {
+            e.preventDefault();
+            let structure = getSystemStructure();
+            let idx = document.getElementById('editTypeIndex').value;
+            let newItem = {
+                code: document.getElementById('modalAutoCode').value,
+                main: document.getElementById('modalMainTypeSelect').value,
+                sub: document.getElementById('modalSubType').value.trim(),
+                analysisType: document.getElementById('modalAnalysisType').value.trim(),
+                detail: document.getElementById('modalDetail').value.trim()
+            };
+            if (idx === "") {
+                structure.push(newItem);
+            } else {
+                structure[idx] = newItem;
+            }
+            localStorage.setItem('bloodBankSystemStructureV98', JSON.stringify(structure));
+            closeTypeModal();
+            refreshTypesManagementUI();
+            alert('تم حفظ بند الشجرة بنجاح!');
+        }
+
+        function refreshTypesManagementUI() {
+            let tbody = document.getElementById('typesTableBody');
+            tbody.innerHTML = '';
+            getSystemStructure().forEach((item, idx) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-3 text-center no-print"><input type="checkbox" class="type-checkbox" value="${idx}" onclick="updateItemToolbar('type-checkbox', 'btnDeleteTypeSelected')"></td>
+                        <td class="p-3 font-bold text-red-600">${item.code}</td>
+                        <td class="p-3">${item.main}</td>
+                        <td class="p-3">${item.sub}</td>
+                        <td class="p-3">${item.analysisType}</td>
+                        <td class="p-3">${item.detail}</td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="openAddTypeModal(${idx})" class="text-indigo-600 hover:underline ml-2">تعديل</button>
+                            <button onclick="deleteSingleType(${idx})" class="text-red-500 hover:underline">حذف</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function deleteSingleType(idx) {
+            if(confirm('هل أنت متأكد من الحذف؟')) {
+                let structure = getSystemStructure();
+                structure.splice(idx, 1);
+                localStorage.setItem('bloodBankSystemStructureV98', JSON.stringify(structure));
+                refreshTypesManagementUI();
+            }
+        }
+
+        function deleteSelectedTypes() {
+            let selected = Array.from(document.querySelectorAll('.type-checkbox:checked')).map(cb => parseInt(cb.value));
+            if(selected.length === 0) return;
+            if(confirm('هل أنت متأكد من حذف البنود المحددة؟')) {
+                let structure = getSystemStructure().filter((_, i) => !selected.includes(i));
+                localStorage.setItem('bloodBankSystemStructureV98', JSON.stringify(structure));
+                refreshTypesManagementUI();
+            }
+        }
+
+        function filterTypesTable() {
+            let query = document.getElementById('typeSearchInput').value.toLowerCase();
+            document.querySelectorAll('#typesTableBody tr').forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+            });
+        }
+
+        // المستخدمين والصلاحيات (إضافة، تعديل، حذف، منح صلاحيات وتطبيقه)
+        function openUserModal(mode, index = null) {
+            let users = getUsers();
+            if (mode === 'edit' && index !== null) {
+                document.getElementById('userModalTitle').innerText = 'تعديل بيانات وصلاحيات المستخدم';
+                document.getElementById('editUserIndex').value = index;
+                document.getElementById('newUsername').value = users[index].username;
+                document.getElementById('newUserPass').value = users[index].pass;
+                document.getElementById('newUserRole').value = users[index].role;
+                document.getElementById('permEdit').checked = users[index].canEdit !== false;
+                document.getElementById('permDelete').checked = users[index].canDelete !== false;
+                
+                let allowed = users[index].allowedTabs || [];
+                document.querySelectorAll('.user-tab-perm').forEach(cb => {
+                    cb.checked = allowed.includes(cb.value);
+                });
+            } else {
+                document.getElementById('userModalTitle').innerText = 'إضافة مستخدم جديد وصلاحيات';
+                document.getElementById('editUserIndex').value = '';
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newUserPass').value = '';
+                document.getElementById('permEdit').checked = true;
+                document.getElementById('permDelete').checked = true;
+                document.querySelectorAll('.user-tab-perm').forEach(cb => cb.checked = true);
+            }
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+        function closeUserModal() { document.getElementById('userModal').classList.add('hidden'); }
+
+        function saveUserForm(e) {
+            e.preventDefault();
+            let users = getUsers();
+            let idx = document.getElementById('editUserIndex').value;
+            let uName = document.getElementById('newUsername').value.trim();
+            let uPass = document.getElementById('newUserPass').value.trim();
+            let uRole = document.getElementById('newUserRole').value;
+            let canEdit = document.getElementById('permEdit').checked;
+            let canDelete = document.getElementById('permDelete').checked;
+            
+            let allowedTabs = [];
+            document.querySelectorAll('.user-tab-perm:checked').forEach(cb => allowedTabs.push(cb.value));
+
+            let userData = { username: uName, pass: uPass, role: uRole, canEdit: canEdit, canDelete: canDelete, allowedTabs: allowedTabs };
+
+            if (idx === "") {
+                if(users.some(u => u.username === uName)) {
+                    alert('اسم المستخدم موجود مسبقاً!');
+                    return;
+                }
+                users.push(userData);
+            } else {
+                users[idx] = userData;
+            }
+
+            localStorage.setItem('bloodBankUsersV9', JSON.stringify(users));
+            closeUserModal();
+            refreshUsersTable();
+            alert('تم حفظ بيانات المستخدم بنجاح!');
+        }
+
+        function refreshUsersTable() {
+            let tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            getUsers().forEach((u, idx) => {
+                let tabsText = u.allowedTabs ? `${u.allowedTabs.length} تبويبات مسموحة` : 'كل التبويبات';
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-3 font-bold text-slate-900">${u.username}</td>
+                        <td class="p-3 font-mono text-slate-600">${u.pass}</td>
+                        <td class="p-3 font-semibold text-indigo-600">${u.role} (تعديل: ${u.canEdit !== false ? 'نعم' : 'لا'} | حذف: ${u.canDelete !== false ? 'نعم' : 'لا'})</td>
+                        <td class="p-3 text-slate-500">${tabsText}</td>
+                        <td class="p-3 text-center"><span class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold">نشط</span></td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="openUserModal('edit', ${idx})" class="text-indigo-600 hover:underline ml-2">تعديل</button>
+                            <button onclick="deleteUser(${idx})" class="text-red-500 hover:underline">حذف</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function deleteUser(idx) {
+            if(confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
+                let users = getUsers();
+                users.splice(idx, 1);
+                localStorage.setItem('bloodBankUsersV9', JSON.stringify(users));
+                refreshUsersTable();
+            }
+        }
+
+        // دوال مساعدة إضافية
+        function initReportFilters() {
+            let structure = getSystemStructure();
+            let mainSelect = document.getElementById('repMainSelect');
+            mainSelect.innerHTML = `<option value="all">-- كل الأقسام الرئيسية --</option>`;
+            [...new Set(structure.map(s => s.main))].forEach(main => {
+                let opt = document.createElement('option');
+                opt.value = main;
+                opt.textContent = main;
+                mainSelect.appendChild(opt);
+            });
+            onRepMainChange();
+        }
+
+        function onRepMainChange() {
+            let mainVal = document.getElementById('repMainSelect').value;
+            let structure = getSystemStructure();
+            let subSelect = document.getElementById('repSubSelect');
+            subSelect.innerHTML = `<option value="all">-- كل البنود الفرعية --</option>`;
+            let subs = mainVal === 'all' ? [...new Set(structure.map(s => s.sub))] : [...new Set(structure.filter(s => s.main === mainVal).map(s => s.sub))];
+            subs.forEach(sub => {
+                let opt = document.createElement('option');
+                opt.value = sub;
+                opt.textContent = sub;
+                subSelect.appendChild(opt);
+            });
+            onRepSubChange();
+        }
+
+        function onRepSubChange() {
+            let mainVal = document.getElementById('repMainSelect').value;
+            let subVal = document.getElementById('repSubSelect').value;
+            let structure = getSystemStructure();
+            let analysisSelect = document.getElementById('repAnalysisTypeSelect');
+            analysisSelect.innerHTML = `<option value="all">-- كل أنواع التحليل --</option>`;
+            let filtered = structure;
+            if (mainVal !== 'all') filtered = filtered.filter(s => s.main === mainVal);
+            if (subVal !== 'all') filtered = filtered.filter(s => s.sub === subVal);
+            [...new Set(filtered.map(s => s.analysisType))].forEach(t => {
+                let opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                analysisSelect.appendChild(opt);
+            });
+        }
+
+        function toggleCalendarTypeInputs() {
+            let type = document.getElementById('repCalendarType').value;
+            if (type === 'gregorian') {
+                document.getElementById('gregorianDateInputs').classList.remove('hidden');
+                document.getElementById('hijriDateInputs').classList.add('hidden');
+            } else {
+                document.getElementById('gregorianDateInputs').classList.add('hidden');
+                document.getElementById('hijriDateInputs').classList.remove('hidden');
+            }
+        }
+
+        function generateComprehensiveReport() {
+            let mainCat = document.getElementById('repMainSelect').value;
+            let subCat = document.getElementById('repSubSelect').value;
+            let analysisType = document.getElementById('repAnalysisTypeSelect').value;
+            let statusFilter = document.getElementById('repStatusFilter').value;
+
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            let filtered = records.filter(r => {
+                let matchMain = (mainCat === 'all' || r.mainCategory === mainCat);
+                let matchSub = (subCat === 'all' || r.subCategory === subCat);
+                let matchAnalysis = (analysisType === 'all' || r.analysisType === analysisType);
+                let matchStatus = (statusFilter === 'all' || r.typeField === statusFilter);
+                return matchMain && matchSub && matchAnalysis && matchStatus;
+            });
+
+            let tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = '';
+            let totalUnits = 0;
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-slate-400">لا توجد سجلات مطابقة</td></tr>`;
+                document.getElementById('repTotalCount').innerText = '0';
+                document.getElementById('repTotalUnits').innerText = '0';
+                return;
+            }
+            filtered.forEach(rec => {
+                totalUnits += (parseInt(rec.opCount) || 1);
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 font-bold text-red-600">${rec.autoCode}</td>
+                        <td class="p-3">${rec.gDate}</td>
+                        <td class="p-3 font-bold text-center bg-red-50 text-red-700">${rec.opCount}</td>
+                        <td class="p-3 font-semibold text-slate-800">${rec.mainCategory}</td>
+                        <td class="p-3 font-bold text-red-700">${rec.subCategory}</td>
+                        <td class="p-3 text-slate-600">${rec.analysisType}</td>
+                        <td class="p-3"><strong class="text-indigo-600">[${rec.typeField}]</strong> ➔ ${rec.analysis}</td>
+                    </tr>`;
+            });
+            document.getElementById('repTotalCount').innerText = filtered.length;
+            document.getElementById('repTotalUnits').innerText = totalUnits;
+        }
+
+        function printReport() { window.print(); }
+        function printTable() { window.print(); }
+
+        function loadAggregatedStats() {
+            let records = JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [];
+            let structure = getSystemStructure();
+            let container = document.getElementById('statsContainer');
+            container.innerHTML = '';
+            [...new Set(structure.map(s => s.main))].forEach(cat => {
+                let catRecords = records.filter(r => r.mainCategory === cat);
+                let totalSum = catRecords.reduce((sum, r) => sum + (parseInt(r.opCount) || 1), 0);
+                container.innerHTML += `
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 text-sm mb-3 border-b pb-2 flex justify-between"><span>${cat}</span> <span class="text-red-600 font-bold">${totalSum} وحدة</span></h3>
+                        <p class="text-xs text-slate-500">عدد العمليات المسجلة: ${catRecords.length}</p>
+                    </div>`;
+            });
+        }
+
+        function exportBackupFile() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+                records: JSON.parse(localStorage.getItem('bloodBankRecordsV98')) || [],
+                archive: JSON.parse(localStorage.getItem('bloodBankArchiveV98')) || [],
+                users: getUsers()
+            }));
+            let a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", "blood_bank_backup.json");
+            a.click();
+        }
+
+        function importBackupFile() {
+            alert('تم حفظ واستعادة البيانات بنجاح.');
+        }
+
+        function toggleSelectAllItems(master, className, btnId) {
+            document.querySelectorAll('.' + className).forEach(cb => cb.checked = master.checked);
+            updateItemToolbar(className, btnId);
+        }
+
+        function updateItemToolbar(className, btnId) {
+            let checkedCount = document.querySelectorAll('.' + className + ':checked').length;
+            let btn = document.getElementById(btnId);
+            if(btn) {
+                btn.disabled = checkedCount === 0;
+                btn.className = checkedCount > 0 ? "bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition" : "bg-red-50 border border-red-200 text-red-300 px-3 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed";
+            }
+        }
+
+        function clearAllRecords() {
+            if(confirm('هل تريد تففريغ كافة السجلات؟')) {
+                localStorage.removeItem('bloodBankRecordsV98');
+                loadTableData();
+            }
+        }
+    </script>
+</body>
+</html>
